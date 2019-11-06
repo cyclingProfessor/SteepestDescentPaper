@@ -1,3 +1,4 @@
+from __future__ import print_function
 import random
 import signal
 import sys
@@ -45,69 +46,68 @@ def main():
     ZeroCarry = tuple(max (*l) for l in zip(Zero,Carry))
     OneStop = tuple(max (*l) for l in zip(One, Stop))
 
-    # The main cost function:
-    WallaceF = CostFunction('WallaceF', tuple([boolean] * 8))
-    WallaceH = CostFunction('WallaceH', tuple([boolean] * 4))
+    # The main cost function f:
+    funF = CostFunction('funF', tuple([boolean] * 8))
+    funH = CostFunction('funH', tuple([boolean] * 4))
     for s in (One, Zero):
-        WallaceF.setCost(One + s, 4)
-        WallaceF.setCost(Carry + s, 6)
-    WallaceF.setCost(Zero + Carry, 13)
-    WallaceF.setCost(Zero + Stop, 13)
-    WallaceF.setCost(Carry + Stop, 8)
+        funF.setCost(One + s, 4)
+        funF.setCost(Carry + s, 6)
+    funF.setCost(Zero + Carry, 13)
+    funF.setCost(Zero + Stop, 13)
+    funF.setCost(Carry + Stop, 8)
 
     # Now the fixes for f in the presence of intermediate values
-    WallaceF.setCost(Carry + OneCarry, 23)
-    WallaceF.setCost(Carry + ZeroStop, 7)
-    WallaceF.setCost(Zero + OneStop, 14)
-    WallaceF.setCost(ZeroCarry + Stop, 12)
-    WallaceF.setCost(ZeroCarry + Carry, 8)
+    funF.setCost(Carry + OneCarry, 23)
+    funF.setCost(Carry + ZeroStop, 7)
+    funF.setCost(Zero + OneStop, 14)
+    funF.setCost(ZeroCarry + Stop, 12)
+    funF.setCost(ZeroCarry + Carry, 8)
 
     # Allow a starting move. Valued function h
-    WallaceH.setCost(ZeroOne, 1)
-    WallaceH.setCost(OneCarry, 5)
+    funH.setCost(ZeroOne, 1)
+    funH.setCost(OneCarry, 5)
 
-    WallaceVars = []
+    Vars = []
     for index in range(4 * length):
         nextV = Variable('name' + str(index), boolean)
-        WallaceVars.append(nextV)
+        Vars.append(nextV)
         if index %4 == 0:
             nextV.setValue('1')
 
-    WallaceCons = []
+    Constraints = []
     weight = 1
     for index in range(length - 1):
         print(index)
-        WallaceCons.append(Constraint('f' + str(index), WallaceVars[4 *index:4 * index + 8], WallaceF, weight))
+        Constraints.append(Constraint('f' + str(index), Vars[4 *index:4 * index + 8], funF, weight))
         weight *= 4
 
-    WallaceCons.append(Constraint('h', WallaceVars[0:4], WallaceH, 1))
+    Constraints.append(Constraint('h', Vars[0:4], funH, 1))
 
-    specPath = Instance(WallaceVars, WallaceCons)
-    printSpec(list(map(lambda v: v.getValue(), WallaceVars)))
+    specPath = Instance(Vars, Constraints)
+    printSpec(list(map(lambda v: v.getValue(), Vars)))
 
     experiment = 0
     move = specPath.bestImprove()
     while not finished and len(move) > 0:
         move[0].setValue(move[1])
-        printSpec(list(map(lambda v: v.getValue(), WallaceVars)))
+        printSpec(list(map(lambda v: v.getValue(), Vars)))
         experiment += 1
         move = specPath.bestImprove()
         # time.sleep(0.1)
-    print("finished Wallace iteration ", experiment, " and exited")
+    print("finished iteration ", experiment, " and exited")
 
 ####################################################################
 
 def printSpec(list):
-    #print list
     names = ['0', '1', '<', 'X']
     for index in range(0, len(list), 4):
         first = list[index: index + 4].index('1')
-        print(names[first],)
+        print(names[first], end='')
         if list[index: index + 4].count('1') > 1:
             second = list[index + first + 1: index + 4].index('1')
-            print(names[first + 1 + second],)
+            print(names[first + 1 + second], end=' ')
         else:
-            print(' ',)
+            print(' ', end=' ')
     print
 
 class BadArgs(Exception):
@@ -132,13 +132,7 @@ class Instance:
             oldValue = v.getValue()
             for d in v:
                 v.setValue(d)
-                # print('Variable:' + v.getName())
-                # print('Value:' + str(v))
-                # print('Old Fitness:' + str(currentValue))
-                # print('New Fitness:' + str(self._value))
-                # print('++++++++++++++++++++++')
                 if self._value > currentValue:
-                    # print('------- Returning -----------')
                     v.setValue(oldValue)
                     return (v,d)
             v.setValue(oldValue)
@@ -152,18 +146,10 @@ class Instance:
             oldValue = v.getValue()
             for d in v:
                 v.setValue(d)
-                # print('Variable:' + v.getName())
-                # print('Value:' + str(v))
-                # print('New Fitness:' + str(self._value))
-                # print('++++++++++++++++++++++')
                 if self._value > currentBest + 0.001:
-                    # print 'Wahoo - better'
                     currentBest = self._value;
                     bestMove = (v,d)
             v.setValue(oldValue)
-        # print('Best Move:',)
-        # if len(bestMove) > 1:
-        #    print(bestMove[0].getName(), bestMove[1])
         return bestMove
     def __str__(self):
         retval = '{'
@@ -202,12 +188,8 @@ class Constraint:
     def addChangeObserver(self, who):
         self._observers.append(who)
     def changed(self):
-        # print(' I have been notified')
-        # print('my name is:' + self._name)
-        # print('New Cost for: ', tuple(v.getValue() for v in self._scope))
         oldValue = self._currentValue
         self._currentValue = self._wt * self._cf.getCost(tuple(v.getValue() for v in self._scope))
-        # print('    is: ', self._currentValue)
         for o in self._observers:
             o.delta(self._currentValue - oldValue)
     def inScope(self, var):
@@ -235,7 +217,6 @@ class Variable:
         if self._value != v:
             self._value = v
             for o in self._observers:
-                #(print 'Notifying Observers')
                 o.changed()
     def getValue(self):
         return self._value
@@ -252,8 +233,6 @@ class CostFunction:
         self._domains = domains
         self._costMatrix = {t:0 for t in itertools.product(*domains)}
     def setCost(self, t, value):
-        # print('Setting cost to: ', value)
-        # print('For tuple: ', t)
         self._costMatrix[t] = value
     def getDomains(self):
         return self._domains
